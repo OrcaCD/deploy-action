@@ -1,0 +1,37 @@
+{
+	"name": "deploy-action",
+	"version": "0.0.0",
+	"private": true,
+	"description": "A GitHub Action to trigger deployments using OrcaCD",
+	"bugs": {
+		"url": "https://github.com/OrcaCD/deploy-action/issues"
+	},
+	"author": "",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/OrcaCD/deploy-action.git"
+	},
+	"type": "module",
+	"exports": {
+		".": "./dist/index.js"
+	},
+	"scripts": {
+		"lint": "oxlint --deny-warnings --type-aware",
+		"format": "oxfmt --write .",
+		"check:types": "tsc --noEmit",
+		"check:format": "oxfmt --check ."
+	},
+	"devDependencies": {
+		"@actions/core": "^3.0.1",
+		"@types/node": "^25.9.3",
+		"oxfmt": "^0.54.0",
+		"oxlint": "^1.69.0",
+		"oxlint-tsgolint": "^0.23.0",
+		"rolldown": "^1.1.1",
+		"typescript": "^6.0.3"
+	},
+	"engines": {
+		"node": ">=24.0.0"
+	},
+	"packageManager": "pnpm@11.6.0"
+}

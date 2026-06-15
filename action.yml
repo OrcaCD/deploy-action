@@ -1,0 +1,21 @@
+name: Deploy with OrcaCD
+description: A GitHub Action to trigger deployments using OrcaCD
+author: OrcaCD
+
+inputs:
+  hub:
+    description: "The OrcaCD hub URL (e.g., https://orca.example.com)"
+    required: true
+  syncRepo:
+    default: false
+    description: "Whether to sync the repository content (compose.yml)"
+  pullImages:
+    default: false
+    description: "Whether to pull the latest container images"
+  pullImagesFilter:
+    default: ""
+    description: 'Filter for selecting specific images to pull (e.g., "image1,image2")'
+
+runs:
+  using: node24
+  main: dist/index.js
