@@ -31,10 +31,6 @@ In addition, you need to enable GitHub Actions access per repository in the Orca
     # Whether to pull the latest container image versions
     # Optional, default: false
     pullImages: false
-
-    # A filter to select which images to pull, comma-separated list of image names
-    # Optional, default: '' (pull all images)
-    pullImagesFilter: ""
 ```
 
 ## Required permissions

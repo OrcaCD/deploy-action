@@ -19,7 +19,8 @@
 		"lint": "oxlint --deny-warnings --type-aware",
 		"format": "oxfmt --write .",
 		"check:types": "tsc --noEmit",
-		"check:format": "oxfmt --check ."
+		"check:format": "oxfmt --check .",
+		"build": "rolldown -c rolldown.config.ts"
 	},
 	"devDependencies": {
 		"@actions/core": "^3.0.1",

@@ -12,9 +12,6 @@ inputs:
   pullImages:
     default: false
     description: "Whether to pull the latest container images"
-  pullImagesFilter:
-    default: ""
-    description: 'Filter for selecting specific images to pull (e.g., "image1,image2")'
 
 runs:
   using: node24
