@@ -20,7 +20,9 @@
 		"format": "oxfmt --write .",
 		"check:types": "tsc --noEmit",
 		"check:format": "oxfmt --check .",
-		"build": "rolldown -c rolldown.config.ts"
+		"build": "rolldown -c rolldown.config.ts",
+		"test": "node --experimental-test-module-mocks --test src/**/*.test.ts",
+		"test:coverage": "node --experimental-test-module-mocks --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=lcov.info --test src/**/*.test.ts"
 	},
 	"devDependencies": {
 		"@actions/core": "^3.0.1",
