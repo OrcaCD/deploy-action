@@ -22,5 +22,10 @@
 		"no-duplicate-imports": "error"
 	},
 	"ignorePatterns": ["dist/", "node_modules/"],
-	"overrides": [{ "files": ["**/*.test.ts"], "rules": { "no-floating-promises": "off" } }]
+	"overrides": [
+		{
+			"files": ["**/*.test.ts"],
+			"rules": { "no-floating-promises": "off", "require-await": "off" }
+		}
+	]
 }

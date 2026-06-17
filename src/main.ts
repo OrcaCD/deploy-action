@@ -20,19 +20,22 @@ export async function run(): Promise<void> {
 				abortController.abort();
 			}, timeoutMs);
 
-			const response = await fetch(endpoint, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`,
-					Accept: "application/json",
-					"User-Agent": "OrcaCD Deploy GitHub Action",
-				},
-				body: JSON.stringify({ syncRepo, pullImages }),
-				signal: abortController.signal,
-			});
-
-			clearTimeout(timeout);
+			let response: Response;
+			try {
+				response = await fetch(endpoint, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${token}`,
+						Accept: "application/json",
+						"User-Agent": "OrcaCD Deploy GitHub Action",
+					},
+					body: JSON.stringify({ syncRepo, pullImages }),
+					signal: abortController.signal,
+				});
+			} finally {
+				clearTimeout(timeout);
+			}
 
 			const json: unknown = await response.json().catch(() => null);
 			const message = extractMessage(json);
