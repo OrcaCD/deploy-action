@@ -35,6 +35,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           config-file: .github/release-please-config.json
           manifest-file: .github/release-please-manifest.json
+          release-as: 0.1.0 # TODO: Remove this once the first release is cut
 
       - name: Extract PR branch
         id: pr-branch
