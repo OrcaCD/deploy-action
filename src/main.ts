@@ -56,12 +56,15 @@ export async function run(): Promise<void> {
 }
 
 function extractMessage(json: unknown): string | undefined {
-	if (
-		json !== null &&
-		typeof json === "object" &&
-		"message" in json &&
-		typeof (json as Record<string, unknown>).message === "string"
-	) {
-		return (json as Record<string, string>).message;
+	if (json === null || typeof json !== "object") {
+		return undefined;
+	}
+
+	const record = json as Record<string, unknown>;
+	if (typeof record.message === "string") {
+		return record.message;
+	}
+	if (typeof record.error === "string") {
+		return record.error;
 	}
 }
