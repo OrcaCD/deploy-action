@@ -148,6 +148,19 @@ describe("run()", () => {
 			);
 		});
 
+		test("uses error field from response body when message is absent", async () => {
+			fetchMock.mock.mockImplementation(async () =>
+				makeResponse(false, 403, {
+					error: 'no repository with GitHub Actions OIDC enabled matches "owner/repo"',
+				}),
+			);
+			await run();
+			assert.equal(
+				setFailedMock.mock.calls[0]?.arguments[0],
+				'Can not start deployment. Hub returned HTTP 403: no repository with GitHub Actions OIDC enabled matches "owner/repo"',
+			);
+		});
+
 		test("falls back to (empty body) when error response has no message", async () => {
 			fetchMock.mock.mockImplementation(async () => makeResponse(false, 500, {}));
 			await run();
