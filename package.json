@@ -27,9 +27,9 @@
 	"devDependencies": {
 		"@actions/core": "^3.0.1",
 		"@types/node": "^26.1.1",
-		"oxfmt": "^0.59.0",
-		"oxlint": "^1.74.0",
-		"oxlint-tsgolint": "^0.25.0",
+		"oxfmt": "^0.60.0",
+		"oxlint": "^1.75.0",
+		"oxlint-tsgolint": "^7.0.2001",
 		"rolldown": "^1.2.0",
 		"typescript": "^7.0.2"
 	},
