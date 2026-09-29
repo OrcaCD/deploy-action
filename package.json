@@ -26,11 +26,11 @@
 	},
 	"devDependencies": {
 		"@actions/core": "^3.0.1",
-		"@types/node": "^26.6.2",
-		"oxfmt": "^0.68.0",
-		"oxlint": "^1.83.0",
-		"oxlint-tsgolint": "^7.0.2002",
-		"rolldown": "^1.2.9",
+		"@types/node": "^26.6.3",
+		"oxfmt": "^0.70.0",
+		"oxlint": "^1.85.0",
+		"oxlint-tsgolint": "^7.0.2003",
+		"rolldown": "^1.2.11",
 		"typescript": "^7.0.2"
 	},
 	"engines": {
