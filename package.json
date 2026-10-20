@@ -27,10 +27,10 @@
 	"devDependencies": {
 		"@actions/core": "^3.0.1",
 		"@types/node": "^26.6.5",
-		"oxfmt": "^0.72.0",
-		"oxlint": "^1.87.0",
+		"oxfmt": "^0.73.0",
+		"oxlint": "^1.88.0",
 		"oxlint-tsgolint": "^7.0.2004",
-		"rolldown": "^1.2.13",
+		"rolldown": "^1.2.14",
 		"typescript": "^7.0.2"
 	},
 	"engines": {
