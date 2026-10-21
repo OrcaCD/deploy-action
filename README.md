@@ -25,7 +25,7 @@ In addition, you need to enable GitHub Actions access per repository in the Orca
     hub: https://orca.example.com
 
     # Whether to sync the repo content (compose files)
-    # Optional, default: true
+    # Optional, default: false
     syncRepo: true
 
     # Whether to pull the latest container image versions
