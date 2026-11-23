@@ -5,6 +5,8 @@ type Config = {
 	endpoint: string;
 	syncRepo: boolean;
 	pullImages: boolean;
+	wait: boolean;
+	timeoutMs: number;
 };
 
 export function getConfig(): Config {
@@ -27,5 +29,19 @@ export function getConfig(): Config {
 		throw new Error("At least one of syncRepo or pullImages must be set to true.");
 	}
 
-	return { hubUrl, endpoint: `${hubUrl}/api/v1/github-actions`, syncRepo, pullImages };
+	const wait = core.getInput("wait") === "" ? true : core.getBooleanInput("wait");
+	const timeout = Number(core.getInput("timeout") || "600");
+	const timeoutMs = timeout * 1000;
+	if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeoutMs > 2_147_483_647) {
+		throw new Error("timeout must be a whole number of seconds between 1 and 2147483.");
+	}
+
+	return {
+		hubUrl,
+		endpoint: `${hubUrl}/api/v1/github-actions`,
+		syncRepo,
+		pullImages,
+		wait,
+		timeoutMs,
+	};
 }

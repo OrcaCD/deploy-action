@@ -8,6 +8,23 @@ const infoMock = mock.fn<(msg: string) => void>();
 const setFailedMock = mock.fn<(msg: string | Error) => void>();
 const setSecretMock = mock.fn<(secret: string) => void>();
 const getIDTokenMock = mock.fn<(aud?: string) => Promise<string>>(async () => "mock-oidc-token");
+const setOutputMock = mock.fn<(name: string, value: string) => void>();
+type SummaryTable = Parameters<typeof import("@actions/core").summary.addTable>[0];
+const addTableMock = mock.fn<(table: SummaryTable) => void>();
+const writeSummaryMock = mock.fn<() => Promise<void>>(() => Promise.resolve());
+const summary = {
+	addHeading() {
+		return this;
+	},
+	addRaw() {
+		return this;
+	},
+	addTable(table: SummaryTable) {
+		addTableMock(table);
+		return this;
+	},
+	write: writeSummaryMock,
+};
 
 mock.module("@actions/core", {
 	exports: {
@@ -17,6 +34,8 @@ mock.module("@actions/core", {
 		setFailed: setFailedMock,
 		setSecret: setSecretMock,
 		getIDToken: getIDTokenMock,
+		setOutput: setOutputMock,
+		summary,
 	},
 });
 
@@ -26,6 +45,8 @@ const defaultConfig = {
 	endpoint: "https://orca.example.com/api/v1/github-actions",
 	syncRepo: true,
 	pullImages: false,
+	wait: true,
+	timeoutMs: 600_000,
 };
 
 const getConfigMock = mock.fn(() => ({ ...defaultConfig }));
@@ -33,6 +54,9 @@ const getConfigMock = mock.fn(() => ({ ...defaultConfig }));
 mock.module("./config.ts", {
 	exports: { getConfig: getConfigMock },
 });
+
+const sleepMock = mock.fn<(delay: number) => Promise<void>>(() => Promise.resolve());
+mock.module("node:timers/promises", { exports: { setTimeout: sleepMock } });
 
 // ── main.ts import (after all mocks) ───────────────────────────────────────
 const { run } = await import("./main.ts");
@@ -59,6 +83,10 @@ function resetAllMocks() {
 	getIDTokenMock.mock.resetCalls();
 	getConfigMock.mock.resetCalls();
 	fetchMock.mock.resetCalls();
+	setOutputMock.mock.resetCalls();
+	addTableMock.mock.resetCalls();
+	writeSummaryMock.mock.resetCalls();
+	sleepMock.mock.resetCalls();
 }
 
 beforeEach(() => {
@@ -69,6 +97,20 @@ beforeEach(() => {
 		makeResponse(true, 200, { message: "Deployment triggered." }),
 	);
 });
+
+const triggerResponse = {
+	triggerId: "trigger-123",
+	message: "Deployment triggered.",
+	applications: [{ id: "app-1", name: "web" }],
+};
+
+function acceptTrigger() {
+	fetchMock.mock.mockImplementationOnce(async () => makeResponse(true, 202, triggerResponse));
+}
+
+function outputs() {
+	return Object.fromEntries(setOutputMock.mock.calls.map((call) => call.arguments));
+}
 
 after(() => {
 	mock.restoreAll();
@@ -227,6 +269,241 @@ describe("run()", () => {
 			});
 			await run();
 			assert.equal(setFailedMock.mock.calls[0]?.arguments[0], "a raw string error");
+		});
+	});
+
+	describe("deployment status", () => {
+		test("keeps fire-and-forget behavior for older Hubs", async () => {
+			await run();
+			assert.equal(fetchMock.mock.callCount(), 1);
+			assert.deepEqual(outputs(), { status: "triggered" });
+			assert.equal(writeSummaryMock.mock.callCount(), 0);
+		});
+
+		test("skips polling when wait is false and still outputs the trigger ID", async () => {
+			getConfigMock.mock.mockImplementationOnce(() => ({ ...defaultConfig, wait: false }));
+			acceptTrigger();
+			await run();
+			assert.equal(fetchMock.mock.callCount(), 1);
+			assert.deepEqual(outputs(), { triggerId: "trigger-123", status: "triggered" });
+			assert.equal(writeSummaryMock.mock.callCount(), 0);
+			assert.equal(setFailedMock.mock.callCount(), 0);
+		});
+
+		test("waits for every application and uses a fresh OIDC token for each poll", async () => {
+			let tokenCount = 0;
+			getIDTokenMock.mock.mockImplementation(async () => `oidc-token-${++tokenCount}`);
+			acceptTrigger();
+			const web = { id: "app-1", name: "web", status: "running", events: [] };
+			const worker = {
+				id: "app-2",
+				name: "worker",
+				status: "skipped",
+				events: [{ type: "image_update", status: "skipped", error: "Auto-sync is paused" }],
+			};
+			fetchMock.mock.mockImplementationOnce(
+				async () =>
+					makeResponse(true, 200, {
+						status: "running",
+						applications: [web, worker],
+					}),
+				1,
+			);
+			fetchMock.mock.mockImplementation(async () =>
+				makeResponse(true, 200, {
+					status: "succeeded",
+					applications: [
+						{
+							...web,
+							status: "succeeded",
+							events: [{ type: "commit_sync", status: "no_change", commit: "abc123" }],
+						},
+						worker,
+					],
+				}),
+			);
+			await run();
+
+			assert.equal(fetchMock.mock.callCount(), 3);
+			assert.deepEqual(
+				getIDTokenMock.mock.calls.map((call) => call.arguments),
+				[[defaultConfig.hubUrl], [defaultConfig.hubUrl], [defaultConfig.hubUrl]],
+			);
+			for (const [index, call] of fetchMock.mock.calls.slice(1).entries()) {
+				const [url, options] = call.arguments;
+				assert.equal(url, `${defaultConfig.endpoint}/triggers/trigger-123`);
+				assert.equal(options?.method, "GET");
+				assert.equal(
+					new Headers(options?.headers).get("Authorization"),
+					`Bearer oidc-token-${index + 2}`,
+				);
+			}
+			assert.deepEqual(
+				sleepMock.mock.calls.map((call) => call.arguments[0]),
+				[5_000],
+			);
+			assert.deepEqual(
+				startGroupMock.mock.calls.map((call) => call.arguments[0]),
+				[
+					"Triggering Deployment",
+					"Deployment: web (running)",
+					"Deployment: worker (skipped)",
+					"Deployment: web (succeeded)",
+				],
+			);
+			assert.equal(endGroupMock.mock.callCount(), 4);
+			assert.deepEqual(outputs(), { triggerId: "trigger-123", status: "succeeded" });
+			assert.deepEqual(addTableMock.mock.calls[0]?.arguments[0].slice(1), [
+				["web", "commit_sync", "abc123", "no_change", "—", "—"],
+				["worker", "image_update", "—", "skipped", "Auto-sync is paused", "—"],
+			]);
+			assert.equal(writeSummaryMock.mock.callCount(), 1);
+			assert.equal(setFailedMock.mock.callCount(), 0);
+		});
+
+		test("fails if a deployment fails and includes its error in the summary", async () => {
+			acceptTrigger();
+			fetchMock.mock.mockImplementation(async () =>
+				makeResponse(true, 200, {
+					status: "failed",
+					applications: [
+						{
+							id: "app-1",
+							name: "web",
+							status: "failed",
+							events: [{ type: "image_update", status: "failed", error: "Health check <failed>" }],
+						},
+					],
+				}),
+			);
+			await run();
+
+			assert.equal(outputs().status, "failed");
+			assert.equal(setFailedMock.mock.calls[0]?.arguments[0], "OrcaCD deployment failed.");
+			assert.deepEqual(addTableMock.mock.calls[0]?.arguments[0][1], [
+				"web",
+				"image_update",
+				"—",
+				"failed",
+				"Health check &lt;failed&gt;",
+				"—",
+			]);
+			assert.equal(writeSummaryMock.mock.callCount(), 1);
+		});
+
+		test("fails on a successful rollback and reports the restored commit", async () => {
+			acceptTrigger();
+			fetchMock.mock.mockImplementation(async () =>
+				makeResponse(true, 200, {
+					status: "succeeded",
+					applications: [
+						{
+							id: "app-1",
+							name: "web",
+							status: "failed",
+							events: [
+								{ type: "commit_sync", status: "failed", commit: "abc123", error: "Unhealthy" },
+								{
+									type: "rollback",
+									status: "succeeded",
+									source: "deployment_failure",
+									commit: "def456",
+								},
+							],
+						},
+					],
+				}),
+			);
+			await run();
+
+			assert.equal(outputs().status, "failed");
+			assert.match(
+				String(setFailedMock.mock.calls[0]?.arguments[0]),
+				/web rolled back and is now running commit def456/,
+			);
+			assert.deepEqual(addTableMock.mock.calls[0]?.arguments[0][2], [
+				"web",
+				"rollback",
+				"def456",
+				"succeeded",
+				"—",
+				"deployment_failure",
+			]);
+		});
+
+		test("backs off on 429 and 5xx and resets the backoff on recovery", async () => {
+			acceptTrigger();
+			for (const [index, status] of [429, 502].entries()) {
+				fetchMock.mock.mockImplementationOnce(
+					async () => makeResponse(false, status, {}),
+					index + 1,
+				);
+			}
+			fetchMock.mock.mockImplementationOnce(
+				async () =>
+					makeResponse(true, 200, {
+						status: "running",
+						applications: [{ id: "app-1", name: "web", status: "running", events: [] }],
+					}),
+				3,
+			);
+			fetchMock.mock.mockImplementationOnce(async () => makeResponse(false, 503, {}), 4);
+			fetchMock.mock.mockImplementation(async () =>
+				makeResponse(true, 200, {
+					status: "succeeded",
+					applications: [{ id: "app-1", name: "web", status: "succeeded", events: [] }],
+				}),
+			);
+			await run();
+
+			assert.deepEqual(
+				sleepMock.mock.calls.map((call) => call.arguments[0]),
+				[5_000, 10_000, 5_000, 5_000],
+			);
+			assert.equal(getIDTokenMock.mock.callCount(), 6);
+			assert.equal(outputs().status, "succeeded");
+		});
+
+		test("fails immediately when the trigger cannot be read by this run", async () => {
+			acceptTrigger();
+			fetchMock.mock.mockImplementation(async () => makeResponse(false, 404, {}));
+			await run();
+			assert.equal(fetchMock.mock.callCount(), 2);
+			assert.match(String(setFailedMock.mock.calls[0]?.arguments[0]), /HTTP 404/);
+		});
+
+		test("fails on timeout, aborts an in-flight request and summarizes known applications", async (context) => {
+			context.mock.timers.enable({ apis: ["setTimeout"] });
+			acceptTrigger();
+			const polling = Promise.withResolvers<AbortSignal>();
+			fetchMock.mock.mockImplementation((_url, options) => {
+				assert(options?.signal);
+				const signal = options.signal;
+				polling.resolve(signal);
+				return new Promise((_resolve, reject) => {
+					signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+				});
+			});
+			const running = run();
+			const signal = await polling.promise;
+			context.mock.timers.tick(defaultConfig.timeoutMs);
+			await running;
+
+			assert.equal(signal.aborted, true);
+			assert.equal(outputs().status, "timeout");
+			assert.match(
+				String(setFailedMock.mock.calls[0]?.arguments[0]),
+				/600s.*deployment may still be running/,
+			);
+			assert.deepEqual(addTableMock.mock.calls[0]?.arguments[0][1], [
+				"web",
+				"—",
+				"—",
+				"running",
+				"—",
+				"—",
+			]);
+			assert.equal(writeSummaryMock.mock.callCount(), 1);
 		});
 	});
 });
