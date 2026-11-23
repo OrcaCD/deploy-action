@@ -149,7 +149,10 @@ describe("run()", () => {
 			assert.equal(headers["Content-Type"], "application/json");
 			assert.equal(headers["Accept"], "application/json");
 			assert.equal(headers["User-Agent"], "OrcaCD Deploy GitHub Action");
-			assert.equal(init.body, JSON.stringify({ syncRepo: true, pullImages: false }));
+			assert.equal(
+				init.body,
+				JSON.stringify({ syncRepo: true, pullImages: false, waitForResult: true }),
+			);
 		});
 
 		test("logs the message from the response body", async () => {
@@ -285,6 +288,10 @@ describe("run()", () => {
 			acceptTrigger();
 			await run();
 			assert.equal(fetchMock.mock.callCount(), 1);
+			assert.equal(
+				fetchMock.mock.calls[0]?.arguments[1]?.body,
+				JSON.stringify({ syncRepo: true, pullImages: false }),
+			);
 			assert.deepEqual(outputs(), { triggerId: "trigger-123", status: "triggered" });
 			assert.equal(writeSummaryMock.mock.callCount(), 0);
 			assert.equal(setFailedMock.mock.callCount(), 0);

@@ -33,7 +33,7 @@ export async function run(): Promise<void> {
 }
 
 async function triggerDeployment(config: Config) {
-	const { hubUrl, endpoint, syncRepo, pullImages } = config;
+	const { hubUrl, endpoint, syncRepo, pullImages, wait } = config;
 	const token = await getToken(hubUrl);
 
 	core.startGroup("Triggering Deployment");
@@ -45,7 +45,7 @@ async function triggerDeployment(config: Config) {
 		const response = await fetch(endpoint, {
 			method: "POST",
 			headers: { ...hubHeaders(token), "Content-Type": "application/json" },
-			body: JSON.stringify({ syncRepo, pullImages }),
+			body: JSON.stringify({ syncRepo, pullImages, waitForResult: wait ? true : undefined }),
 			signal,
 		});
 		const body = await readBody(response, signal);
