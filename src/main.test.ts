@@ -431,14 +431,75 @@ describe("run()", () => {
 			]);
 		});
 
-		test("backs off on 429 and 5xx and resets the backoff on recovery", async () => {
-			acceptTrigger();
-			for (const [index, status] of [429, 502].entries()) {
-				fetchMock.mock.mockImplementationOnce(
-					async () => makeResponse(false, status, {}),
-					index + 1,
+		for (const { rollback, message, row } of [
+			{
+				rollback: { type: "rollback", status: "failed", commit: "def456", error: "Agent offline" },
+				message: "OrcaCD deployment failed. web rollback to commit def456 (failed).",
+				row: ["web", "rollback", "def456", "failed", "Agent offline", "Yes"],
+			},
+			{
+				rollback: { type: "rollback", status: "failed", error: "No previous deployment" },
+				message: "OrcaCD deployment failed. web rollback (failed).",
+				row: ["web", "rollback", "—", "failed", "No previous deployment", "Yes"],
+			},
+			{
+				rollback: { type: "rollback", status: "succeeded" },
+				message: "OrcaCD deployment failed. web rolled back.",
+				row: ["web", "rollback", "—", "succeeded", "—", "Yes"],
+			},
+		]) {
+			const target = rollback.commit ? "with a target commit" : "without a target commit";
+			test(`reports a ${rollback.status} rollback ${target}`, async () => {
+				acceptTrigger();
+				fetchMock.mock.mockImplementation(async () =>
+					makeResponse(true, 200, {
+						status: "failed",
+						applications: [{ id: "app-1", name: "web", status: "failed", events: [rollback] }],
+					}),
 				);
-			}
+				await run();
+
+				assert.equal(outputs().status, "failed");
+				assert.equal(setFailedMock.mock.calls[0]?.arguments[0], message);
+				assert.deepEqual(addTableMock.mock.calls[0]?.arguments[0][1], row);
+			});
+		}
+
+		for (const { invalid, applications } of [
+			{ invalid: "application", applications: [null] },
+			{
+				invalid: "event",
+				applications: [{ id: "app-1", name: "web", status: "succeeded", events: [null] }],
+			},
+		]) {
+			test(`rejects a successful status response containing a null ${invalid}`, async () => {
+				acceptTrigger();
+				fetchMock.mock.mockImplementation(async () =>
+					makeResponse(true, 200, { status: "succeeded", applications }),
+				);
+				await run();
+
+				assert.equal(fetchMock.mock.callCount(), 2);
+				assert.equal(
+					setFailedMock.mock.calls[0]?.arguments[0],
+					"Hub returned an invalid deployment status response.",
+				);
+				assert.deepEqual(outputs(), { triggerId: "trigger-123" });
+				assert.equal(writeSummaryMock.mock.callCount(), 0);
+			});
+		}
+
+		test("cancels the response body before retrying and resets backoff on recovery", async () => {
+			acceptTrigger();
+			const cancel = mock.fn();
+			fetchMock.mock.mockImplementationOnce(
+				async () => new Response(new ReadableStream({ cancel }), { status: 429 }),
+				1,
+			);
+			fetchMock.mock.mockImplementationOnce(async () => {
+				assert.equal(cancel.mock.callCount(), 1);
+				return makeResponse(false, 502, {});
+			}, 2);
 			fetchMock.mock.mockImplementationOnce(
 				async () =>
 					makeResponse(true, 200, {
