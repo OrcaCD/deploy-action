@@ -31,7 +31,28 @@ In addition, you need to enable GitHub Actions access per repository in the Orca
     # Whether to pull the latest container image versions
     # Optional, default: false
     pullImages: false
+
+    # Whether to wait for deployment results
+    # Optional, default: true
+    wait: true
+
+    # Maximum wait in seconds after the Hub accepts the trigger
+    # Optional, default: 600
+    timeout: 600
 ```
+
+When waiting, the action writes a job summary with each application's operations and results.
+The step fails if a deployment fails, an automatic rollback occurs, or the timeout expires. A successful rollback reports the restored commit when the Hub provides it. On timeout, the deployment may still be running.
+
+Set `timeout` higher than the longest health gate timeout for the affected applications. Allow additional time for queueing, deployment, and any rollback. The maximum is 86,400 seconds (24 hours).
+Set `wait: false` to exit after the Hub accepts the trigger. Older Hubs that omit the trigger ID also use this behavior.
+
+## Outputs
+
+| Output      | Description                                                                                                       |
+| ----------- | ----------------------------------------------------------------------------------------------------------------- |
+| `triggerId` | Deployment trigger ID, when provided by the Hub.                                                                  |
+| `status`    | `succeeded`, `failed`, `timeout`, or `triggered` when polling is skipped. Request errors leave this output unset. |
 
 ## Required permissions
 

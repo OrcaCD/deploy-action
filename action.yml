@@ -12,6 +12,18 @@ inputs:
   pullImages:
     default: false
     description: "Whether to pull the latest container images"
+  wait:
+    default: true
+    description: "Whether to wait for deployment results from the Hub"
+  timeout:
+    default: "600"
+    description: "Maximum wait for deployment results, in whole seconds"
+
+outputs:
+  triggerId:
+    description: "Deployment trigger ID, when the Hub provides one"
+  status:
+    description: "Deployment result: succeeded, failed, timeout, or triggered when polling is skipped"
 
 runs:
   using: node24

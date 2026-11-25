@@ -14,7 +14,7 @@ mock.module("@actions/core", {
 const { getConfig } = await import("./config.ts");
 
 function setHub(value: string) {
-	getInputMock.mock.mockImplementation(() => value);
+	getInputMock.mock.mockImplementation((name) => (name === "hub" ? value : ""));
 }
 
 function setFlags(syncRepo: boolean, pullImages: boolean) {
@@ -168,10 +168,9 @@ describe("getConfig()", () => {
 			assert.equal(result.endpoint, "https://orca.example.com/api/v1/github-actions");
 		});
 
-		test("calls getInput once with 'hub'", () => {
+		test("requires the hub input", () => {
 			getConfig();
-			assert.equal(getInputMock.mock.callCount(), 1);
-			assert.equal(getInputMock.mock.calls[0]?.arguments[0], "hub");
+			assert.deepEqual(getInputMock.mock.calls[0]?.arguments, ["hub", { required: true }]);
 		});
 
 		test("calls getBooleanInput for 'syncRepo' and 'pullImages'", () => {
@@ -181,4 +180,39 @@ describe("getConfig()", () => {
 			assert(names.includes("pullImages"));
 		});
 	});
+
+	test("waits by default with a 600-second timeout", () => {
+		const config = getConfig();
+		assert.equal(config.wait, true);
+		assert.equal(config.timeoutMs, 600_000);
+	});
+
+	test("accepts explicit wait and timeout settings", () => {
+		const inputs: Record<string, string> = {
+			hub: "https://orca.example.com",
+			wait: "false",
+			timeout: "900",
+		};
+		getInputMock.mock.mockImplementation((name) => inputs[name] ?? "");
+		const config = getConfig();
+		assert.equal(config.wait, false);
+		assert.equal(config.timeoutMs, 900_000);
+		assert(getBooleanInputMock.mock.calls.some((call) => call.arguments[0] === "wait"));
+	});
+
+	test("accepts a timeout of exactly 24 hours", () => {
+		getInputMock.mock.mockImplementation((name) =>
+			name === "timeout" ? "86400" : name === "hub" ? "https://orca.example.com" : "",
+		);
+		assert.equal(getConfig().timeoutMs, 86_400_000);
+	});
+
+	for (const timeout of ["0", "-1", "Infinity", "1.5", "later", "86401"]) {
+		test(`rejects invalid timeout input ${timeout}`, () => {
+			getInputMock.mock.mockImplementation((name) =>
+				name === "timeout" ? timeout : name === "hub" ? "https://orca.example.com" : "",
+			);
+			assert.throws(getConfig, /timeout must be a whole number of seconds/);
+		});
+	}
 });
