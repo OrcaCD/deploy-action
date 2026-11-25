@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/OrcaCD/deploy-action/compare/v0.1.1...v0.1.2) (2026-11-25)
+
+
+### Features
+
+* Wait for OrcaCD deployment results ([#35](https://github.com/OrcaCD/deploy-action/issues/35)) ([55d0e63](https://github.com/OrcaCD/deploy-action/commit/55d0e632e80a6c2771af8f76286126df098e961f))
+
+
+### Bug Fixes
+
+* syncRepo option default in Readme ([#28](https://github.com/OrcaCD/deploy-action/issues/28)) ([1912fb8](https://github.com/OrcaCD/deploy-action/commit/1912fb8088a383659b3c795598783dc75e616ccf))
+
 ## [0.1.1](https://github.com/OrcaCD/deploy-action/compare/v0.1.0...v0.1.1) (2026-07-14)
 
 
