@@ -41,10 +41,10 @@ In addition, you need to enable GitHub Actions access per repository in the Orca
     timeout: 600
 ```
 
-When waiting, the action polls the Hub every five seconds and writes a job summary with each application's operations and results.
+When waiting, the action writes a job summary with each application's operations and results.
 The step fails if a deployment fails, an automatic rollback occurs, or the timeout expires. A successful rollback reports the restored commit when the Hub provides it. On timeout, the deployment may still be running.
 
-Set `timeout` higher than the longest health gate timeout for the affected applications. Allow additional time for queueing, deployment, and any rollback.
+Set `timeout` higher than the longest health gate timeout for the affected applications. Allow additional time for queueing, deployment, and any rollback. The maximum is 86,400 seconds (24 hours).
 Set `wait: false` to exit after the Hub accepts the trigger. Older Hubs that omit the trigger ID also use this behavior.
 
 ## Outputs

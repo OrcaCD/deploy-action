@@ -200,7 +200,14 @@ describe("getConfig()", () => {
 		assert(getBooleanInputMock.mock.calls.some((call) => call.arguments[0] === "wait"));
 	});
 
-	for (const timeout of ["0", "-1", "Infinity", "1.5", "later", "2147484"]) {
+	test("accepts a timeout of exactly 24 hours", () => {
+		getInputMock.mock.mockImplementation((name) =>
+			name === "timeout" ? "86400" : name === "hub" ? "https://orca.example.com" : "",
+		);
+		assert.equal(getConfig().timeoutMs, 86_400_000);
+	});
+
+	for (const timeout of ["0", "-1", "Infinity", "1.5", "later", "86401"]) {
 		test(`rejects invalid timeout input ${timeout}`, () => {
 			getInputMock.mock.mockImplementation((name) =>
 				name === "timeout" ? timeout : name === "hub" ? "https://orca.example.com" : "",

@@ -102,7 +102,16 @@ async function waitForDeployment(config: Config, id: string, applications: Appli
 
 	const rollbacks = rollbackDetails(latest);
 	core.setOutput("status", status);
-	await writeSummary(status, latest);
+	for (const app of latest) {
+		if (app.status === "skipped") {
+			core.warning(`OrcaCD skipped deployment for ${app.name}.`);
+		}
+	}
+	try {
+		await writeSummary(status, latest);
+	} catch (error) {
+		core.warning(`Could not write the OrcaCD deployment summary: ${String(error)}`);
+	}
 	const details = rollbacks.length ? ` ${rollbacks.join(" ")}` : "";
 	if (status === "timeout") {
 		throw new Error(

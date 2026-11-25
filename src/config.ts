@@ -1,5 +1,7 @@
 import * as core from "@actions/core";
 
+const maxTimeoutSeconds = 24 * 60 * 60; // The Hub retains trigger results for 24 hours.
+
 type Config = {
 	hubUrl: string;
 	endpoint: string;
@@ -31,9 +33,10 @@ export function getConfig(): Config {
 
 	const wait = core.getInput("wait") === "" ? true : core.getBooleanInput("wait");
 	const timeout = Number(core.getInput("timeout") || "600");
-	const timeoutMs = timeout * 1000;
-	if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeoutMs > 2_147_483_647) {
-		throw new Error("timeout must be a whole number of seconds between 1 and 2147483.");
+	if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeout > maxTimeoutSeconds) {
+		throw new Error(
+			`timeout must be a whole number of seconds between 1 and ${maxTimeoutSeconds}.`,
+		);
 	}
 
 	return {
@@ -42,6 +45,6 @@ export function getConfig(): Config {
 		syncRepo,
 		pullImages,
 		wait,
-		timeoutMs,
+		timeoutMs: timeout * 1000,
 	};
 }

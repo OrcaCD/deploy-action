@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 const startGroupMock = mock.fn<(name: string) => void>();
 const endGroupMock = mock.fn<() => void>();
 const infoMock = mock.fn<(msg: string) => void>();
+const warningMock = mock.fn<(msg: string) => void>();
 const setFailedMock = mock.fn<(msg: string | Error) => void>();
 const setSecretMock = mock.fn<(secret: string) => void>();
 const getIDTokenMock = mock.fn<(aud?: string) => Promise<string>>(async () => "mock-oidc-token");
@@ -31,6 +32,7 @@ mock.module("@actions/core", {
 		startGroup: startGroupMock,
 		endGroup: endGroupMock,
 		info: infoMock,
+		warning: warningMock,
 		setFailed: setFailedMock,
 		setSecret: setSecretMock,
 		getIDToken: getIDTokenMock,
@@ -78,6 +80,7 @@ function resetAllMocks() {
 	startGroupMock.mock.resetCalls();
 	endGroupMock.mock.resetCalls();
 	infoMock.mock.resetCalls();
+	warningMock.mock.resetCalls();
 	setFailedMock.mock.resetCalls();
 	setSecretMock.mock.resetCalls();
 	getIDTokenMock.mock.resetCalls();
@@ -365,6 +368,28 @@ describe("run()", () => {
 				["worker", "image_update", "—", "skipped", "Auto-sync is paused", "—"],
 			]);
 			assert.equal(writeSummaryMock.mock.callCount(), 1);
+			assert.deepEqual(
+				warningMock.mock.calls.map((call) => call.arguments[0]),
+				["OrcaCD skipped deployment for worker."],
+			);
+			assert.equal(setFailedMock.mock.callCount(), 0);
+		});
+
+		test("warns and preserves a successful deployment when the job summary cannot be written", async () => {
+			acceptTrigger();
+			fetchMock.mock.mockImplementation(async () =>
+				makeResponse(true, 200, {
+					status: "succeeded",
+					applications: [{ id: "app-1", name: "web", status: "succeeded", events: [] }],
+				}),
+			);
+			writeSummaryMock.mock.mockImplementationOnce(() =>
+				Promise.reject(new Error("Summary unavailable")),
+			);
+			await run();
+
+			assert.equal(outputs().status, "succeeded");
+			assert.match(String(warningMock.mock.calls[0]?.arguments[0]), /Summary unavailable/);
 			assert.equal(setFailedMock.mock.callCount(), 0);
 		});
 
@@ -378,7 +403,13 @@ describe("run()", () => {
 							id: "app-1",
 							name: "web",
 							status: "failed",
-							events: [{ type: "image_update", status: "failed", error: "Health check <failed>" }],
+							events: [
+								{
+									type: "image_update",
+									status: "failed",
+									error: "Health check <failed>\r\n\nAgent offline",
+								},
+							],
 						},
 					],
 				}),
@@ -392,14 +423,17 @@ describe("run()", () => {
 				"image_update",
 				"—",
 				"failed",
-				"Health check &lt;failed&gt;",
+				"Health check &lt;failed&gt;<br><br>Agent offline",
 				"—",
 			]);
 			assert.equal(writeSummaryMock.mock.callCount(), 1);
 		});
 
-		test("fails on a successful rollback and reports the restored commit", async () => {
+		test("fails on a successful rollback and reports the restored commit even if the summary fails", async () => {
 			acceptTrigger();
+			writeSummaryMock.mock.mockImplementationOnce(() =>
+				Promise.reject(new Error("Summary unavailable")),
+			);
 			fetchMock.mock.mockImplementation(async () =>
 				makeResponse(true, 200, {
 					status: "succeeded",
@@ -428,6 +462,7 @@ describe("run()", () => {
 				String(setFailedMock.mock.calls[0]?.arguments[0]),
 				/web rolled back and is now running commit def456/,
 			);
+			assert.match(String(warningMock.mock.calls[0]?.arguments[0]), /Summary unavailable/);
 			assert.deepEqual(addTableMock.mock.calls[0]?.arguments[0][2], [
 				"web",
 				"rollback",
